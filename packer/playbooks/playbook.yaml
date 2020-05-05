@@ -1,0 +1,65 @@
+---
+# playbook.yml
+- name: "Base Setup"
+  import_playbook: base.yaml
+
+- name: "Install Vault"
+  hosts: default
+  gather_facts: no
+  become: true
+  vars:
+    vault_version: 1.4.0
+
+  tasks:
+  - name: Create Vault Group
+    group:
+      name: vault
+      state: present
+
+  - name: Create Vault User
+    user:
+      name: vault
+      state: present
+
+  - name: Download Vault Binary
+    get_url:
+      url: https://releases.hashicorp.com/vault/{{ vault_version }}+ent/vault_{{ vault_version }}+ent_linux_amd64.zip
+      dest: ./vault.zip
+      checksum: sha256:https://releases.hashicorp.com/vault/{{ vault_version }}+ent/vault_{{ vault_version }}+ent_SHA256SUMS
+
+  - name: Unpack Vault Binary
+    unarchive:
+      remote_src: yes
+      src: ./vault.zip
+      dest: /usr/local/bin/
+
+  - name: Set Vault Binary Owner
+    file:
+      path: /usr/local/bin/vault
+      owner: vault
+      group: vault
+      mode: +x
+
+  - name: Copy Vault systemd
+    copy:
+      src: ./vault.service
+      dest: /etc/systemd/system/vault.service
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Make Vault Raft Data Directory
+    file:
+      path: /opt/vault/data
+      state: directory
+      owner: vault
+      group: vault
+
+  - name: Disable Vault Service
+    systemd:
+      name: vault
+      enabled: no
+
+  - name:
+    shell:
+      cmd: "curl -sSL https://raw.githubusercontent.com/vmware/cloud-init-vmware-guestinfo/master/install.sh | sudo sh -"
